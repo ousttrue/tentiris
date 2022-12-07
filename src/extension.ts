@@ -2,60 +2,88 @@
 // Import the module and reference it with the alias vscode in your code below
 'use strict';
 
-import * as net from 'net';
-import * as vscode from 'vscode';
-import * as path from 'path';
+import * as net from "net";
+import * as path from "path";
+import { ExtensionContext, ExtensionMode, workspace } from "vscode";
 import {
     LanguageClient,
     LanguageClientOptions,
     ServerOptions,
-    TransportKind
-} from 'vscode-languageclient/node';
+} from "vscode-languageclient/node";
 
 let client: LanguageClient;
 
-// This method is called when your extension is activated
-// Your extension is activated the very first time the command is executed
-export function activate(context: vscode.ExtensionContext) {
+function getClientOptions(): LanguageClientOptions {
+    return {
+        // Register the server for plain text documents
+        documentSelector: [
+            { scheme: "file", language: "json" },
+            { scheme: "untitled", language: "json" },
+        ],
+        outputChannelName: "[pygls] JsonLanguageServer",
+        synchronize: {
+            // Notify the server about file changes to '.clientrc files contain in the workspace
+            fileEvents: workspace.createFileSystemWatcher("**/.clientrc"),
+        },
+    };
+}
 
-    // Use the console to output diagnostic information (console.log) and errors (console.error)
-    // This line of code will only be executed once when your extension is activated
-    console.log('launch tentiris...');
-
-    // const serverPath: string = context.asAbsolutePath(path.join("python", "tentiris", "server.py"));
-    // const serverOptions: ServerOptions = { command: "python", args: [serverPath] };
-
-    const serverOptions: ServerOptions = function () {
-        return new Promise((resolve, reject) => {
-            var client = new net.Socket();
-            client.connect(32123, "127.0.0.1", function () {
+function startLangServerTCP(host: string, addr: number): LanguageClient {
+    console.debug(`connect ${host}:${addr}`)
+    const serverOptions: ServerOptions = () => {
+        return new Promise((resolve /*, reject */) => {
+            const clientSocket = new net.Socket();
+            clientSocket.connect(addr, host, () => {
                 resolve({
-                    reader: client,
-                    writer: client
+                    reader: clientSocket,
+                    writer: clientSocket,
                 });
             });
         });
-    }
-
-    const clientOptions: LanguageClientOptions = {
-        documentSelector: [
-            { scheme: "file", language: "markdown" }
-        ],
-        synchronize: {
-            // Notify the server about file changes to '.clientrc files contained in the workspace
-            fileEvents: vscode.workspace.createFileSystemWatcher('**/.clientrc')
-        }
     };
 
-    // Create the language client and start the client.
-    client = new LanguageClient(
-        'tentiris',
-        'Tentiris Server',
+    return new LanguageClient(
+        `tcp lang server (port ${addr})`,
         serverOptions,
-        clientOptions
+        getClientOptions()
     );
-    client.start();
 }
 
-// This method is called when your extension is deactivated
-export function deactivate() { }
+function startLangServer(
+    command: string,
+    args: string[],
+    cwd: string
+): LanguageClient {
+    const serverOptions: ServerOptions = {
+        args,
+        command,
+        options: { cwd },
+    };
+
+    return new LanguageClient(command, serverOptions, getClientOptions());
+}
+
+export function activate(context: ExtensionContext): void {
+    if (context.extensionMode === ExtensionMode.Development) {
+        // Development - Run the server manually
+        client = startLangServerTCP('localhost', 32123);
+    } else {
+        // Production - Client is going to run the server (for use within `.vsix` package)
+        const cwd = path.join(__dirname, "..", "..", "python");
+        const pythonPath = workspace
+            .getConfiguration("python")
+            .get<string>("pythonPath");
+
+        if (!pythonPath) {
+            throw new Error("`python.pythonPath` is not set");
+        }
+
+        client = startLangServer(pythonPath, ["-m", "tentiris"], cwd);
+    }
+
+    context.subscriptions.push(client.start());
+}
+
+export function deactivate(): Thenable<void> {
+    return client ? client.stop() : Promise.resolve();
+}
