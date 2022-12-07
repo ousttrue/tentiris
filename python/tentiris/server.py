@@ -1,51 +1,40 @@
-from typing import BinaryIO
-import sys
-from pyls_jsonrpc.dispatchers import MethodDispatcher
-from pyls_jsonrpc.endpoint import Endpoint
-from pyls_jsonrpc.streams import JsonRpcStreamReader, JsonRpcStreamWriter
+from pygls.server import LanguageServer
+from lsprotocol import types
+import logging
+
+LOGGER = logging.getLogger(__name__)
 
 
-class TentirisServer(MethodDispatcher):
-    def __init__(self, stdin: BinaryIO, stdout: BinaryIO):
-        self.jsonrpc_stream_reader = JsonRpcStreamReader(stdin)
-        self.jsonrpc_stream_writer = JsonRpcStreamWriter(stdout)
-        self.endpoint = Endpoint(self, self.jsonrpc_stream_writer.write)
+def launch(host: str, port: int):
+    server = LanguageServer("example-server", "v0.1")
 
-    def start(self):
-        self.jsonrpc_stream_reader.listen(self.endpoint.consume)
+    LOGGER.info(f"launch: {host}:{port}...")
+    server.start_tcp(host, port)
 
-    def m_initialize(self, rootUri=None, **kwargs):
-        return {
-            "capabilities": {
-                # クイックフィックス機能
-                "codeActionProvider": True,
-                # コード補完機能
-                "completionProvider": {
-                    "resolveProvider": False,
-                    "triggerCharacters": [".", "#"],
-                },
-                # ドキュメントのフォーマット機能
-                "documentFormattingProvider": True,
-                # 保存や変更時の機能
-                "textDocumentSync": {
-                    "change": 1,  # 変更時のリクエストにファイル内容をすべて含める（2にすると差分のみになる）
-                    "save": {
-                        "includeText": True,  # 保存時のリクエストに本文を含める
-                    },
-                    "openClose": True,  # 開閉時にイベントを発火させる
-                },
-                # 多分ワークスペースの切り替わりも監視するみたいな機能？（よくわかってない）
-                "workspace": {
-                    "workspaceFolders": {"supported": True, "changeNotifications": True}
-                },
-            }
-        }
+    @server.feature(
+        types.TEXT_DOCUMENT_COMPLETION,
+        types.CompletionOptions(trigger_characters=[","]),
+    )
+    def completions(params: types.CompletionParams):
+        """Returns completion items."""
+        return types.CompletionList(
+            is_incomplete=False,
+            items=[
+                types.CompletionItem(label="Item1"),
+                types.CompletionItem(label="Item2"),
+                types.CompletionItem(label="Item3"),
+            ],
+        )
+
+    @server.command("myVerySpecialCommandName")
+    def cmd_return_hello_world(ls, *args):
+        return "Hello World!"
 
 
-def launch(stdin: BinaryIO, stdout: BinaryIO):
-    sls = TentirisServer(stdin, stdout)
-    sls.start()
+def main():
+    logging.basicConfig(level=logging.INFO)
+    launch("localhost", 32123)
 
 
 if __name__ == "__main__":
-    launch(sys.stdin.buffer, sys.stdout.buffer)
+    main()
