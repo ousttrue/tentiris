@@ -1,0 +1,21 @@
+[build-system]
+requires = ["setuptools", "setuptools-scm"]
+build-backend = "setuptools.build_meta"
+
+[project]
+name = "tentiris"
+description = "language server for markdown"
+readme = "README.md"
+requires-python = ">=3.10"
+keywords = ["one", "two"]
+license = {text = "BSD 3-Clause License"}
+classifiers = [
+    "Programming Language :: Python :: 3.10",
+]
+dependencies = [
+    "pygls",
+]
+dynamic = ["version"]
+
+[project.scripts]
+tentiris = "tentiris.__main__:main"

@@ -1,9 +1,33 @@
 import argparse
 import logging
 
-from .server import json_server
+from .server import tentiris_server
 
-logging.basicConfig(level=logging.INFO)
+import logging
+
+mapping = {
+    "TRACE": "[ trace ]",
+    "DEBUG": "[ \x1b[0;36mdebug\x1b[0m ]",
+    "INFO": "[  \x1b[0;32minfo\x1b[0m ]",
+    "WARNING": "[  \x1b[0;33mwarn\x1b[0m ]",
+    "WARN": "[  \x1b[0;33mwarn\x1b[0m ]",
+    "ERROR": "\x1b[0;31m[ error ]\x1b[0m",
+    "ALERT": "\x1b[0;37;41m[ alert ]\x1b[0m",
+    "CRITICAL": "\x1b[0;37;41m[ alert ]\x1b[0m",
+}
+
+
+class ColorfulHandler(logging.StreamHandler):
+    """
+    https://pod.hatenablog.com/entry/2020/03/01/221715
+    """
+
+    def emit(self, record: logging.LogRecord) -> None:
+        record.levelname = mapping[record.levelname]
+        super().emit(record)
+
+
+logging.basicConfig(level=logging.INFO, handlers=[ColorfulHandler()])
 LOGGER = logging.getLogger(__name__)
 
 
@@ -22,11 +46,11 @@ def main():
     args = parser.parse_args()
 
     if args.tcp:
-        json_server.start_tcp(args.host, args.port)
+        tentiris_server.start_tcp(args.host, args.port)
     elif args.ws:
-        json_server.start_ws(args.host, args.port)
+        tentiris_server.start_ws(args.host, args.port)
     else:
-        json_server.start_io()
+        tentiris_server.start_io()
 
 
 if __name__ == "__main__":
