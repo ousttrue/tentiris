@@ -1,50 +1,116 @@
+from typing import Optional, Any
 import argparse
 import logging
-
-from .server import language_server
-
+import lsprotocol.types as lsp_types
+from pygls.server import LanguageServer
 import logging
-
-mapping = {
-    "TRACE": "[ trace ]",
-    "DEBUG": "[ \x1b[0;36mdebug\x1b[0m ]",
-    "INFO": "[  \x1b[0;32minfo\x1b[0m ]",
-    "WARNING": "[  \x1b[0;33mwarn\x1b[0m ]",
-    "WARN": "[  \x1b[0;33mwarn\x1b[0m ]",
-    "ERROR": "\x1b[0;31m[ error ]\x1b[0m",
-    "ALERT": "\x1b[0;37;41m[ alert ]\x1b[0m",
-    "CRITICAL": "\x1b[0;37;41m[ alert ]\x1b[0m",
-}
+from . import commands, features
+from .colorful_log_handler import ColorfulHandler
 
 
-class ColorfulHandler(logging.StreamHandler):
-    """
-    https://pod.hatenablog.com/entry/2020/03/01/221715
-    """
-
-    def emit(self, record: logging.LogRecord) -> None:
-        record.levelname = mapping[record.levelname]
-        super().emit(record)
-
-
-logging.basicConfig(level=logging.INFO, handlers=[ColorfulHandler()])
 LOGGER = logging.getLogger(__name__)
 
 
-def add_arguments(parser):
-    parser.description = "simple json server example"
+def init_language_server() -> LanguageServer:
+    language_server = LanguageServer("tentiris", "v0.1")
 
+    def register_feature(
+        tentiris_server, feature_name: str, f, options: Optional[Any] = None
+    ):
+        @tentiris_server.feature(feature_name, options)
+        def wrapper(*args, **keys):
+            f(tentiris_server, *args, **keys)
+
+        return wrapper
+
+    def register_command(tentiris_server, command_name: str, f):
+        @tentiris_server.command(command_name)
+        def wrapper(*args, **keys):
+            f(tentiris_server, *args, **keys)
+
+        return wrapper
+
+    def register_thread_command(tentiris_server, command_name: str, f):
+        @tentiris_server.thread()
+        @tentiris_server.command(command_name)
+        def wrapper(*args, **keys):
+            f(tentiris_server, *args, **keys)
+
+        return wrapper
+
+    register_feature(
+        language_server,
+        lsp_types.TEXT_DOCUMENT_COMPLETION,
+        features.completions,
+        lsp_types.CompletionOptions(trigger_characters=[","]),
+    )
+    register_command(
+        language_server,
+        "countDownBlocking",
+        commands.count_down_10_seconds_blocking,
+    )
+    register_command(
+        language_server,
+        "countDownNonBlocking",
+        commands.count_down_10_seconds_non_blocking,
+    )
+    register_feature(
+        language_server, lsp_types.TEXT_DOCUMENT_DID_CHANGE, features.did_change
+    )
+    register_feature(
+        language_server, lsp_types.TEXT_DOCUMENT_DID_CLOSE, features.did_close
+    )
+    register_feature(
+        language_server, lsp_types.TEXT_DOCUMENT_DID_OPEN, features.did_open
+    )
+    register_feature(
+        language_server,
+        lsp_types.TEXT_DOCUMENT_SEMANTIC_TOKENS_FULL,
+        features.semantic_tokens,
+        lsp_types.SemanticTokensLegend(token_types=["operator"], token_modifiers=[]),
+    )
+    register_command(language_server, "progress", commands.progress)
+    register_command(
+        language_server,
+        "registerCompletions",
+        commands.register_completions,
+    )
+    register_command(
+        language_server,
+        "showConfigurationAsync",
+        commands.show_configuration_async,
+    )
+    register_command(
+        language_server,
+        "showConfigurationCallback",
+        commands.show_configuration_callback,
+    )
+    register_thread_command(
+        language_server, "showConfigurationThread", commands.show_configuration_thread
+    )
+    register_command(
+        language_server,
+        "unregisterCompletions",
+        commands.unregister_completions,
+    )
+
+    return language_server
+
+
+def main():
+    logging.basicConfig(level=logging.INFO, handlers=[ColorfulHandler()])
+
+    # args
+    parser = argparse.ArgumentParser()
+    parser.description = "simple json server example"
     parser.add_argument("--tcp", action="store_true", help="Use TCP server")
     parser.add_argument("--ws", action="store_true", help="Use WebSocket server")
     parser.add_argument("--host", default="127.0.0.1", help="Bind to this address")
     parser.add_argument("--port", type=int, default=32123, help="Bind to this port")
-
-
-def main():
-    parser = argparse.ArgumentParser()
-    add_arguments(parser)
     args = parser.parse_args()
 
+    # language server
+    language_server = init_language_server()
     if args.tcp:
         language_server.start_tcp(args.host, args.port)
     elif args.ws:
