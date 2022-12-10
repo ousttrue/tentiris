@@ -1,7 +1,7 @@
 import argparse
 import logging
 
-from .server import tentiris_server
+from .server import language_server
 
 import logging
 
@@ -46,11 +46,11 @@ def main():
     args = parser.parse_args()
 
     if args.tcp:
-        tentiris_server.start_tcp(args.host, args.port)
+        language_server.start_tcp(args.host, args.port)
     elif args.ws:
-        tentiris_server.start_ws(args.host, args.port)
+        language_server.start_ws(args.host, args.port)
     else:
-        tentiris_server.start_io()
+        language_server.start_io()
 
 
 if __name__ == "__main__":
