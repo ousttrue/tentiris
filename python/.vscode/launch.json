@@ -5,7 +5,7 @@
     "version": "0.2.0",
     "configurations": [
         {
-            "name": "Python: Module",
+            "name": "Tentiris",
             "type": "python",
             "request": "launch",
             "module": "tentiris",
@@ -17,6 +17,14 @@
                 "32123"
             ],
             "justMyCode": false
+        },
+        {
+            "name": "build_treesitter",
+            "type": "python",
+            "request": "launch",
+            "program": "${workspaceFolder}/build_treesitter.py",
+            "console": "integratedTerminal",
+            "justMyCode": true
         },
     ]
 }

@@ -9,4 +9,5 @@
         "lsprotocol",
         "pygls"
     ],
+    "mesonbuild.configureOnOpen": true,
 }
