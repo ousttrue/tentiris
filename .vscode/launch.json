@@ -10,7 +10,7 @@
 			"type": "extensionHost",
 			"request": "launch",
 			"args": [
-				"${workspaceFolder}/docs",
+				"${workspaceFolder}/python/docs",
 				"--extensionDevelopmentPath=${workspaceFolder}"
 			],
 			"outFiles": [
