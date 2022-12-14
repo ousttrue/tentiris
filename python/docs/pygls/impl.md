@@ -13,14 +13,15 @@
 
 ## completion
 
-### 内部リンクの対象を列挙したい
+### 内部リンクを列挙したい
 
 ```
+[ここ](参照先のパス)を確認ください
 {doc}`ここ<参照先のパス>` を確認ください
 {doc}`参照先のパス` を確認ください
 ```
 
-### toctree の対象を列挙したい
+### toctree を列挙したい
 ````
 ```{toctree}
 vscode_extension/index
@@ -29,9 +30,28 @@ markdown/index
 ```
 ````
 
-### 内部リンクにジャンプしたい
+### myst のディレクティブを列挙したい
 
-- goto-definition
+````
+```{block_directive}
+```
+
+{inline_directive}`hoge`
+````
+
+### block_directive の引数
+
+````
+```{block_directive}
+:maxdepth: 2
+:caption: Content
+:param1: some
+:param2: fuga
+```
+````
+
+## goto-definition
+### 内部リンクにジャンプしたい
 
 ## ページのアウトライン表示
 
