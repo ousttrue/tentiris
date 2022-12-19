@@ -19,14 +19,14 @@ def init_language_server() -> LanguageServer:
     ):
         @tentiris_server.feature(feature_name, options)
         def wrapper(*args, **keys):
-            f(tentiris_server, *args, **keys)
+            return f(tentiris_server, *args, **keys)
 
         return wrapper
 
     def register_command(tentiris_server, command_name: str, f):
         @tentiris_server.command(command_name)
         def wrapper(*args, **keys):
-            f(tentiris_server, *args, **keys)
+            return f(tentiris_server, *args, **keys)
 
         return wrapper
 
@@ -34,7 +34,7 @@ def init_language_server() -> LanguageServer:
         @tentiris_server.thread()
         @tentiris_server.command(command_name)
         def wrapper(*args, **keys):
-            f(tentiris_server, *args, **keys)
+            return f(tentiris_server, *args, **keys)
 
         return wrapper
 

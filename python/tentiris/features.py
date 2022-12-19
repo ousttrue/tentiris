@@ -87,7 +87,7 @@ def completions(
     return lsp_types.CompletionList(
         is_incomplete=False,
         items=[
-            lsp_types.CompletionItem(label='"'),
+            lsp_types.CompletionItem(label='"', detail="quote"),
             lsp_types.CompletionItem(label="["),
             lsp_types.CompletionItem(label="]"),
             lsp_types.CompletionItem(label="{"),
@@ -129,9 +129,9 @@ def semantic_tokens_from_utf8bytes(src: bytes) -> List[SemanticToken]:
                         traverse(cursor.node, indent + "  ")
                         if not cursor.goto_next_sibling():
                             break
-            case "inline":
+            case "inline" | "paragraph" | "fenced_code_block":
                 pass
-            case "atx_h1_marker":
+            case "atx_h1_marker" | "atx_h2_marker":
                 data.append(
                     SemanticToken.create(node, lsp_types.SemanticTokenTypes.Struct)
                 )
