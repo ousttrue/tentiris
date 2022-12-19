@@ -98,7 +98,7 @@ def init_language_server() -> LanguageServer:
 
 
 def main():
-    logging.basicConfig(level=logging.INFO, handlers=[ColorfulHandler()])
+    logging.basicConfig(level=logging.WARN, handlers=[ColorfulHandler()])
 
     # args
     parser = argparse.ArgumentParser()

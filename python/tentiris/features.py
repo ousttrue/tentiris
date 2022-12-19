@@ -1,9 +1,8 @@
-from typing import Optional, List, NamedTuple, Tuple
+from typing import Optional, List, NamedTuple, Tuple, Iterable
 import json
-import re
 import lsprotocol.types as lsp_types
 from pygls.server import LanguageServer
-from pygls.protocol import LanguageServerProtocol
+
 
 import tree_sitter
 import logging
@@ -15,12 +14,49 @@ NAME = "tentiris"
 MD_LANGUAGE = tree_sitter.Language("build/my-languages.dll", "markdown")
 
 
-def _validate_markdown(source: str):
-
+def treesitter_parse(utf8_bytes: bytes) -> tree_sitter.Tree:
     parser = tree_sitter.Parser()
     parser.set_language(MD_LANGUAGE)
+    return parser.parse(utf8_bytes)
+
+
+def iter_node(
+    node: tree_sitter.Node, parent: List[tree_sitter.Node]
+) -> Iterable[List[tree_sitter.Node]]:
+    path = [node] + parent
+    yield path
+
+    cursor = node.walk()
+    if cursor.goto_first_child():
+        while True:
+            for child in iter_node(cursor.node, path):
+                yield child
+            if not cursor.goto_next_sibling():
+                break
+
+
+def node_contains(node: tree_sitter.Node, position: lsp_types.Position) -> bool:
+    if position.line < node.start_point[0]:
+        return False
+    if position.line > node.end_point[0]:
+        return False
+    if position.line == node.start_point[0]:
+        if position.character < node.start_point[1]:
+            return False
+        if position.line == node.end_point[0]:
+            return position.character <= node.end_point[1]
+        else:
+            return True
+    else:
+        if position.line == node.end_point[0]:
+            return position.character <= node.end_point[1]
+        else:
+            return True
+
+
+def _validate_markdown(source: str):
     try:
-        parsed = parser.parse(source.encode("utf-8"))
+        parsed = treesitter_parse(source.encode("utf-8"))
         return []
     except Exception as e:
         LOGGER.warn(e)
@@ -80,20 +116,50 @@ def did_close(ls: LanguageServer, params: lsp_types.DidCloseTextDocumentParams):
 
 
 def completions(
-    ls,
-    params: Optional[lsp_types.CompletionParams] = None,
+    ls: LanguageServer,
+    params: lsp_types.CompletionParams,
 ) -> lsp_types.CompletionList:
-    """Returns completion items."""
-    return lsp_types.CompletionList(
-        is_incomplete=False,
-        items=[
-            lsp_types.CompletionItem(label='"', detail="quote"),
-            lsp_types.CompletionItem(label="["),
-            lsp_types.CompletionItem(label="]"),
-            lsp_types.CompletionItem(label="{"),
-            lsp_types.CompletionItem(label="}"),
-        ],
-    )
+    """ """
+    uri = params.text_document.uri
+    doc = ls.workspace.get_document(uri)
+    tree = treesitter_parse(doc.source.encode("utf-8"))
+
+    active_node = None
+    active_path = []
+    for path in iter_node(tree.root_node, []):
+        node = path[0]
+        if params.position.line < node.start_point[0]:
+            break
+        if node_contains(node, params.position):
+            active_node = node
+            active_path = path
+
+    assert active_node
+    match active_node.type:
+        case "document":
+            return lsp_types.CompletionList(
+                is_incomplete=False,
+                items=[
+                    lsp_types.CompletionItem(label='"', detail="quote"),
+                    lsp_types.CompletionItem(label="["),
+                    lsp_types.CompletionItem(label="]"),
+                    lsp_types.CompletionItem(label="{"),
+                    lsp_types.CompletionItem(label="}"),
+                ],
+            )
+
+        case _:
+            LOGGER.warn(active_path)
+            return lsp_types.CompletionList(
+                is_incomplete=False,
+                items=[
+                    lsp_types.CompletionItem(label='"', detail="quote"),
+                    lsp_types.CompletionItem(label="["),
+                    lsp_types.CompletionItem(label="]"),
+                    lsp_types.CompletionItem(label="{"),
+                    lsp_types.CompletionItem(label="}"),
+                ],
+            )
 
 
 class SemanticToken(NamedTuple):
@@ -112,14 +178,12 @@ class SemanticToken(NamedTuple):
 
 
 def semantic_tokens_from_utf8bytes(src: bytes) -> List[SemanticToken]:
-    parser = tree_sitter.Parser()
-    parser.set_language(MD_LANGUAGE)
-    parsed = parser.parse(src)
+    parsed = treesitter_parse(src)
 
     data: List[SemanticToken] = []
 
     def traverse(node: tree_sitter.Node, indent=""):
-        print(f"{indent}{node}")
+        # print(f"{indent}{node}")
 
         match node.type:
             case "document" | "section" | "list" | "atx_heading":
